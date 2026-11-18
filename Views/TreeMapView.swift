@@ -1,17 +1,18 @@
 
 import SwiftUI
 import MapKit
+import UIKit
 
 struct TreeMapView: View {
 
-    // MARK: - State
+    // MARK: - Properties
 
     @StateObject private var donationManager = DonationManager.shared
 
     @State private var selectedLocation: PlantedTreeLocation? =
         PlantedTreeLocation.philippinesLocations.first
 
-    @State private var showReservePhoto = false
+    @State private var photoLocation: PlantedTreeLocation?
 
     // MARK: - Map Camera
 
@@ -34,24 +35,17 @@ struct TreeMapView: View {
         NavigationStack {
             ZStack(alignment: .bottom) {
 
-                // Interactive Philippine Map
+                // Interactive Philippine map
                 Map(position: $position) {
-                    ForEach(
-                        PlantedTreeLocation.philippinesLocations
-                    ) { location in
-
+                    ForEach(PlantedTreeLocation.philippinesLocations) { location in
                         Annotation(
                             location.regionName,
                             coordinate: location.coordinate
                         ) {
                             Button {
-                                withAnimation(.spring()) {
-                                    selectedLocation = location
-                                }
-                                showReservePhoto = true
-
+                                selectReserve(location)
                             } label: {
-                                marker(for: location)
+                                treeMarker(for: location)
                             }
                             .buttonStyle(.plain)
                         }
@@ -60,40 +54,44 @@ struct TreeMapView: View {
                 .mapStyle(.hybrid(elevation: .realistic))
                 .ignoresSafeArea(edges: .bottom)
 
-                // Selected Reserve Details
+                // Selected reserve card
                 if let location = selectedLocation {
                     reserveDetails(location)
                         .transition(
                             .move(edge: .bottom)
-                            .combined(with: .opacity)
+                                .combined(with: .opacity)
                         )
                 }
             }
             .navigationTitle("Philippine Reforestation")
             .navigationBarTitleDisplayMode(.inline)
-            .sheet(isPresented: $showReservePhoto) {
-                if let location = selectedLocation {
-                    reservePhotoSheet(location)
-                }
+            .sheet(item: $photoLocation) { location in
+                reservePhotoSheet(location)
             }
         }
     }
 
+    // MARK: - Reserve Selection
+
+    private func selectReserve(_ location: PlantedTreeLocation) {
+        withAnimation(.spring()) {
+            selectedLocation = location
+        }
+
+        photoLocation = location
+    }
+
     // MARK: - Tree Marker
 
-    private func marker(
+    private func treeMarker(
         for location: PlantedTreeLocation
     ) -> some View {
-
         VStack(spacing: 0) {
-
             Image(systemName: "tree.circle.fill")
                 .resizable()
                 .frame(width: 32, height: 32)
                 .foregroundStyle(.green)
-                .background(
-                    Circle().fill(.white)
-                )
+                .background(Circle().fill(.white))
 
             Image(systemName: "triangle.fill")
                 .resizable()
@@ -103,8 +101,7 @@ struct TreeMapView: View {
                 .offset(y: -2)
         }
         .scaleEffect(
-            selectedLocation?.id == location.id
-            ? 1.25 : 1.0
+            selectedLocation?.id == location.id ? 1.25 : 1.0
         )
         .animation(
             .spring(),
@@ -117,73 +114,78 @@ struct TreeMapView: View {
     private func reserveDetails(
         _ location: PlantedTreeLocation
     ) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
 
-        VStack(alignment: .leading, spacing: 12) {
-
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-
+            // Reserve heading
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 5) {
                     Text(location.regionName)
                         .font(.headline)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                    Text(
-                        "\(location.country) • Partner: \(location.partnerName)"
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    Text("\(location.country) • Partner: \(location.partnerName)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Spacer()
+                Spacer(minLength: 4)
 
                 Image(systemName: "leaf.fill")
-                    .foregroundStyle(.green)
                     .font(.title2)
+                    .foregroundStyle(.green)
             }
 
             Divider()
 
-            HStack(spacing: 16) {
-
-                VStack(alignment: .leading) {
-                    Text("Trees Planted")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Text("\(location.treesPlanted) 🌲")
-                        .font(.title3.bold())
-                }
-
-                Spacer()
-
-                VStack(alignment: .leading) {
-                    Text("Date Planted")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Text(location.datePlanted)
-                        .font(.title3.bold())
-                }
-
-                Spacer()
-
-                VStack(alignment: .leading) {
-                    Text("Coordinates")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Text(
-                        String(
-                            format: "%.2f, %.2f",
-                            location.coordinate.latitude,
-                            location.coordinate.longitude
-                        )
+            // Reserve statistics
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 12) {
+                    reserveStat(
+                        title: "Trees Planted",
+                        value: "\(location.treesPlanted) 🌲"
                     )
-                    .font(.footnote.bold())
+
+                    Spacer(minLength: 4)
+
+                    reserveStat(
+                        title: "Date Planted",
+                        value: location.datePlanted
+                    )
+
+                    Spacer(minLength: 4)
+
+                    reserveStat(
+                        title: "Coordinates",
+                        value: coordinates(for: location)
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .top, spacing: 12) {
+                        reserveStat(
+                            title: "Trees Planted",
+                            value: "\(location.treesPlanted) 🌲"
+                        )
+
+                        Spacer()
+
+                        reserveStat(
+                            title: "Date Planted",
+                            value: location.datePlanted
+                        )
+                    }
+
+                    reserveStat(
+                        title: "Coordinates",
+                        value: coordinates(for: location)
+                    )
                 }
             }
 
+            // Open photo
             Button {
-                showReservePhoto = true
+                photoLocation = location
             } label: {
                 Label(
                     "View Reserve Photo",
@@ -192,19 +194,38 @@ struct TreeMapView: View {
                 .font(.subheadline.bold())
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .padding(12)
+                .padding(13)
                 .background(.green)
                 .clipShape(
                     RoundedRectangle(cornerRadius: 12)
                 )
             }
         }
-        .padding()
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(.ultraThinMaterial)
         .clipShape(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 18)
         )
-        .padding()
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
+    }
+
+    // MARK: - Statistic Component
+
+    private func reserveStat(
+        title: String,
+        value: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.subheadline.bold())
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     // MARK: - Reserve Photo Sheet
@@ -212,80 +233,197 @@ struct TreeMapView: View {
     private func reservePhotoSheet(
         _ location: PlantedTreeLocation
     ) -> some View {
-
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+            GeometryReader { geometry in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
 
-                    reserveImage(for: location)
+                        // Forest image
+                        reserveImage(for: location)
 
-                    Text(location.regionName)
-                        .font(.title2.bold())
+                        // Forest name
+                        Text(location.regionName)
+                            .font(.title2.bold())
+                            .fixedSize(
+                                horizontal: false,
+                                vertical: true
+                            )
 
-                    Label(
-                        "Philippine Reforestation Site",
-                        systemImage: "leaf.fill"
-                    )
-                    .foregroundStyle(.green)
-
-                    Text(
-                        "Partner: \(location.partnerName)"
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
-                    Divider()
-
-                    HStack {
+                        // Reforestation label
                         Label(
-                            "\(location.treesPlanted) Trees",
-                            systemImage: "tree.fill"
+                            "Philippine Reforestation Site",
+                            systemImage: "leaf.fill"
                         )
+                        .font(.subheadline)
+                        .foregroundStyle(.green)
 
-                        Spacer()
+                        // Partner
+                        Text("Partner: \(location.partnerName)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(
+                                horizontal: false,
+                                vertical: true
+                            )
 
-                        Text(location.datePlanted)
+                        Divider()
+
+                        // Planting information
+                        HStack(alignment: .top, spacing: 16) {
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Trees Planted")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+
+                                Label(
+                                    "\(location.treesPlanted) Trees",
+                                    systemImage: "tree.fill"
+                                )
+                                .font(.subheadline.bold())
+                            }
+                            .frame(
+                                maxWidth: .infinity,
+                                alignment: .leading
+                            )
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Date Planted")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+
+                                Text(location.datePlanted)
+                                    .font(.subheadline.bold())
+                                    .fixedSize(
+                                        horizontal: false,
+                                        vertical: true
+                                    )
+                            }
+                            .frame(
+                                maxWidth: .infinity,
+                                alignment: .leading
+                            )
+                        }
+
+                        Divider()
+
+                        // Location
+                        Label(
+                            "Location: \(location.country)",
+                            systemImage: "mappin.circle.fill"
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                        Text("Coordinates: \(coordinates(for: location))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Divider()
+
+                        // Conservation information
+                        Label(
+                            "Forest Conservation",
+                            systemImage: "leaf.circle.fill"
+                        )
+                        .font(.headline)
+                        .foregroundStyle(.green)
+
+                        Text(
+                            "This reserve is part of the Philippine reforestation monitoring initiative. The application displays the reserve location, planting information, and conservation records."
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
                     }
-                    .font(.subheadline)
-
-                    Text(
-                        "Location: \(location.country)"
+                    .frame(
+                        width: max(0, geometry.size.width - 32),
+                        alignment: .leading
                     )
-                    .foregroundStyle(.secondary)
+                    .padding(16)
                 }
-                .padding()
+                .frame(width: geometry.size.width)
             }
             .navigationTitle("Reserve Photo")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
-                        showReservePhoto = false
+                        photoLocation = nil
                     }
+                    .foregroundStyle(.green)
                 }
             }
         }
     }
 
-    // MARK: - Reserve Image
+    // MARK: - Forest Image
 
     private func reserveImage(
         for location: PlantedTreeLocation
     ) -> some View {
-
         let imageName = reserveImageName(
             for: location.regionName
         )
 
-        return Image(imageName)
-            .resizable()
-            .scaledToFill()
-            .frame(maxWidth: .infinity)
-            .frame(height: 260)
-            .clipped()
+        return GeometryReader { geometry in
+            Group {
+                if let image = UIImage(named: imageName) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(
+                            width: geometry.size.width,
+                            height: 260
+                        )
+                        .clipped()
+                } else {
+                    missingImagePlaceholder(imageName)
+                        .frame(
+                            width: geometry.size.width,
+                            height: 260
+                        )
+                }
+            }
             .clipShape(
-                RoundedRectangle(cornerRadius: 18)
+                RoundedRectangle(cornerRadius: 16)
             )
+        }
+        .frame(height: 260)
+    }
+
+    // MARK: - Missing Image Placeholder
+
+    private func missingImagePlaceholder(
+        _ imageName: String
+    ) -> some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color.green.opacity(0.7),
+                    Color.green.opacity(0.3)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            VStack(spacing: 12) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: 42))
+
+                Text("Reserve Photo Unavailable")
+                    .font(.headline)
+
+                Text("Missing asset: \(imageName)")
+                    .font(.caption)
+                    .multilineTextAlignment(.center)
+            }
+            .foregroundStyle(.white)
+            .padding()
+        }
     }
 
     // MARK: - Image Asset Mapping
@@ -293,8 +431,11 @@ struct TreeMapView: View {
     private func reserveImageName(
         for regionName: String
     ) -> String {
-
         let name = regionName.lowercased()
+
+        if name.contains("sierra madre") {
+            return "sierra_madre_forest"
+        }
 
         if name.contains("calabarzon") {
             return "calabarzon_forest"
@@ -313,6 +454,18 @@ struct TreeMapView: View {
         }
 
         return "default_forest"
+    }
+
+    // MARK: - Coordinate Formatter
+
+    private func coordinates(
+        for location: PlantedTreeLocation
+    ) -> String {
+        String(
+            format: "%.2f, %.2f",
+            location.coordinate.latitude,
+            location.coordinate.longitude
+        )
     }
 }
 
